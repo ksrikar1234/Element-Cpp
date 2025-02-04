@@ -5,6 +5,13 @@
 
 namespace gp_std
 {
+    // Public API
+    // Example To Create ScopeExit 
+    // auto file = load_file("file"); 
+    // auto file_closer = gp_std::scope_exit([&file] { file.close });
+    template <typename Callable>
+    scope_exit<Callable> scope_exit(Callable &&func);
+
     template <typename Callable>
     class scope_exit
     {
@@ -56,7 +63,7 @@ namespace gp_std
     };
 
     template <typename Callable>
-    scope_exit<Callable> make_scope_guard(Callable &&func)
+    scope_exit<Callable> scope_exit(Callable &&func)
     {
         return scope_exit<Callable>(std::forward<Callable>(func));
     }
