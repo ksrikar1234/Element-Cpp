@@ -8,18 +8,18 @@ namespace gp_std
     // Public API
     // Example To Create ScopeExit 
     // auto file = load_file("file"); 
-    // auto file_closer = gp_std::scope_exit([&file] { file.close });
+    // auto file_closer = gp_std::scope_exit_guard([&file] { file.close });
     template <typename Callable>
-    scope_exit<Callable> scope_exit(Callable &&func);
+    scope_exit_guard<Callable> scope_exit(Callable &&func);
 
     template <typename Callable>
-    class scope_exit
+    class scope_exit_guard
     {
     public:
-        explicit scope_exit(Callable &&func)
+        explicit scope_exit_guard(Callable &&func)
             : m_func(std::forward<Callable>(func)), m_active(true) {}
 
-        ~scope_exit()
+        ~scope_exit_guard()
         {
             if (m_active)
             {
@@ -27,19 +27,16 @@ namespace gp_std
             }
         }
 
-        // Disable copy semantics to prevent multiple calls
-        scope_exit(const scope_exit &) = delete;
-        scope_exit &operator=(const scope_exit &) = delete;
+        scope_exit_guard(const scope_exit_guard &) = delete;
+        scope_exit_guard &operator=(const scope_exit_guard &) = delete;
 
-        // Move constructor to transfer ownership
-        scope_exit(scope_exit &&other) noexcept
+        scope_exit_guard(scope_exit_guard &&other) noexcept
             : m_func(std::move(other.m_func)), m_active(other.m_active)
         {
             other.m_active = false;
         }
 
-        // Move assignment to transfer ownership
-        scope_exit &operator=(scope_exit&& other) noexcept
+        scope_exit_guard &operator=(scope_exit_guard&& other) noexcept
         {
             if (this != &other)
             {
@@ -63,9 +60,9 @@ namespace gp_std
     };
 
     template <typename Callable>
-    scope_exit<Callable> scope_exit(Callable &&func)
+    scope_exit_guard<Callable> scope_exit(Callable &&func)
     {
-        return scope_exit<Callable>(std::forward<Callable>(func));
+        return scope_exit_guard<Callable>(std::forward<Callable>(func));
     }
 
 } // namespace gp_std
