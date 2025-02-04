@@ -8,7 +8,7 @@ namespace gp_std
     // Public API
     // Example To Create ScopeExit 
     // auto file = load_file("file"); 
-    // auto file_closer = gp_std::scope_exit_guard([&file] { file.close });
+    // auto file_closer = gp_std::scope_exit([&file] { file.close });
     template <typename Callable>
     scope_exit_guard<Callable> scope_exit(Callable &&func);
 
