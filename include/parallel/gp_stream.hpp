@@ -102,7 +102,7 @@ public:
     using ConstAction = callable<void(const T&)>;  // (Promising no modification)    
     
     // For For in Range Operation
-    using RangeAction = callable<void(T&, const int&)>;
+    using RangeAction = callable<void(T&, Index_Type)>;
     using ConstRangeAction = callable<void(const T&, Index_Type)>;  // (Promising no modification)
 
     // +-----------------------------------------------------------------------------------------------------------------+
