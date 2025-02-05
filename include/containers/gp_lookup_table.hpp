@@ -10,13 +10,45 @@
 namespace gp_std
 {
 
-// Primary API. Go to this class for Actually using them
+// Primary API for lookup_table class. Go to this class for Actually using them
+// A lookup table is a read-only data structure that maps keys to values
+// Its Base Container is a std::vector of std::pair<Key, Value>
+// When a key is looked up, the table returns a pointer to the value
+
+// Advantages:
+// It provides fast lookups and is optimized for read-only use cases
+// The lookup table can be created from a std::map or std::unordered_map
+// It supports both hash-based and tree-based lookup tables
+// It is a header-only library
+
+// Limitations:
+// Insertions are not allowed in the lookup table
+// The lookup table is not thread-safe yet but can be made thread-safe by using locks
+// Its
+
+// Usage:
+// --> Create a lookup table from a std::map or std::unordered_map
+// std::map<int, std::string> data = {{1, "one"}, {2, "two"}, {3, "three"}};
+// std::unordered_map<int, std::string> data = {{1, "one"}, {2, "two"}, {3, "three"}};
+
+// --> Construct a lookup table
+// lookup_table<int, std::string> table(data);
+// or 
+// lookup_table<int, std::string> table(data.begin(), data.end(), size(if known));
+
+// --> Query the lookup table whether its a hash table or tree table
+//  table.is_tree_table() or table.is_hash_table()
+
+// std::string* value = table.lookup(2); // or table[2]
+// if (value)
+// {
+//     std::cout << *value << std::endl; // Output: two
+// }
 template <typename Key, typename Value>
 class lookup_table;
 
 namespace gp_private
 {
-
 template <typename Key, typename Value>
 class base_lookup_table;
 
