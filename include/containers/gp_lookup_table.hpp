@@ -333,7 +333,12 @@ public:
 } // namespace gp_private
 
 
-// Interface for lookup tables (Insertions are not allowed)
+/// @class lookup_table
+/// @tparam Key 
+/// @tparam Value 
+/// @brief A lookup table is a read-only data structure that maps keys to values.
+/// @brief The lookup table is optimized for read-only use cases and provides fast lookups.
+/// @brief The lookup table can be created from a std::map or std::unordered_map.
 template <typename Key, typename Value>
 class lookup_table
 {
