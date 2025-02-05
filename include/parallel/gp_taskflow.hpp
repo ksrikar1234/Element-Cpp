@@ -22,15 +22,18 @@
 #include <mutex>
 #include <atomic>
 #include <condition_variable>
+#include <future>
 
+// Usage :
 // gp_std::taskflowgraph graph;
+// graph.set_executor(gp_std::async_executor::make());  
 
 // graph.add_task("Task1", []
 //                { std::cout << "Executing Task 1\n"; });
 // graph.add_task("Task2", []
 //                { std::cout << "Executing Task 2\n"; });
 // graph.add_task("Task3", []
-//                { std::cout << "Executing Task 3\n"; });
+//                { std::cout << "Executing Task 3\n"; std::this_thread::sleep_for(std::chrono::seconds(2)); });
 // graph.add_task("Task4", []
 //                { std::cout << "Executing Task 4\n"; });
 // graph.add_task("Task5", []
@@ -46,424 +49,575 @@
 
 namespace gp_std
 {
-// Private Stuff
-class Timer
-{
-public:
-    Timer() : m_start_time(std::chrono::steady_clock::now()) {}
-
-    double now() const
+    class executor_base
     {
-        return std::chrono::duration<double>(std::chrono::steady_clock::now() - m_start_time).count();
-    }
-
-    void reset()
-    {
-        m_start_time = std::chrono::steady_clock::now();
-    }
-
-private:
-    std::chrono::steady_clock::time_point m_start_time;
-};
-
-template <typename T>
-class Stable_VectorIdxPtr
-{
     public:
-    Stable_VectorIdxPtr() : m_vec(nullptr), m_idx(0) {}
-    Stable_VectorIdxPtr(std::nullptr_t) : m_vec(nullptr), m_idx(0) {}
+        virtual void enqueue(std::vector<std::function<void()>>& tasks) = 0;
+        virtual ~executor_base() = default;
+        virtual std::shared_ptr<executor_base> clone() const = 0;
+    };
 
-    Stable_VectorIdxPtr(std::vector<T>& vec, size_t idx) : m_vec(&vec), m_idx(idx) 
+    class executor
     {
-        if(m_idx >= m_vec->size())
+        public:
+        executor(std::shared_ptr<executor_base> executor) : m_executor(executor) {}
+
+        executor() : m_executor(nullptr) {}
+
+        executor& operator=(std::shared_ptr<executor_base> executor)
         {
-            throw std::out_of_range("Index out of range");
+            m_executor = executor;
+            return *this;
         }
 
-        if(m_vec->empty())
+        executor& operator=(const executor& other)
         {
-            throw std::out_of_range("Vector is empty");
+            m_executor = other.m_executor;
+            return *this;
+        }
+       
+        void enqueue(std::vector<std::function<void()>> tasks)
+        {
+            if(m_executor) m_executor->enqueue(tasks);
         }
 
-    }
-
-    Stable_VectorIdxPtr(const Stable_VectorIdxPtr& other) : m_vec(other.m_vec), m_idx(other.m_idx) {}
-    Stable_VectorIdxPtr(Stable_VectorIdxPtr&& other) : m_vec(other.m_vec), m_idx(other.m_idx) {}
-
-    Stable_VectorIdxPtr& operator=(const Stable_VectorIdxPtr& other)
-    {
-        m_vec = other.m_vec;
-        m_idx = other.m_idx;
-        return *this;
-    }
-
-    Stable_VectorIdxPtr& operator=(Stable_VectorIdxPtr&& other)
-    {
-        m_vec = other.m_vec;
-        m_idx = other.m_idx;
-        return *this;
-    }
-    
-    T* operator->() { return &(vec()->at(m_idx)); }
-    const T* operator->() const { return &(vec()->at(m_idx)); }
-
-    T& operator*() { return vec()->at(m_idx); }
-    const T& operator*() const { return vec()->at(m_idx); }
-
-    bool operator==(const Stable_VectorIdxPtr& other) const { return m_vec == other.m_vec && m_idx == other.m_idx; }
-    bool operator!=(const Stable_VectorIdxPtr& other) const { return !(*this == other); }
-
-    bool operator==(T* other) const { return &(vec()->at(m_idx)) == other; }
-    bool operator!=(T* other) const { return !(this == other); }
-
-    bool operator==(std::nullptr_t) const { return m_vec == nullptr; }
-    bool operator!=(std::nullptr_t) const { return m_vec != nullptr; }
-    
-    operator T*()             { return &(vec()->at(m_idx)); }
-    operator const T*() const { return &(vec()->at(m_idx)); }
-    operator bool() const { return vec() != nullptr; }
-
-    size_t index() const { return m_idx; }
-    
-    private:
-    std::vector<T>* vec() const
-    {
-        if(m_vec == nullptr)
+        std::shared_ptr<executor_base> clone() const
         {
-           throw std::runtime_error("Null Pointer Acess In StableVectorIDXptr\n");
-        }
-        return m_vec;
-    }
-
-    private:
-    std::vector<T>* m_vec;
-    size_t m_idx;
-};
-
-
-class Task
-{
-public:
-    Task(const char* name, std::function<void()> func) : m_name(std::move(name)), m_func(std::move(func)),  m_execution_status(false) {}
-
-    Task(const Task& other) : m_name(other.m_name), m_func(other.m_func),  m_execution_status(other.m_execution_status.load()) {}
-    Task(Task&& other) : m_name(std::move(other.m_name)), m_func(std::move(other.m_func)), m_execution_status(other.m_execution_status.load()) {}
-
-    void add_dependency(Stable_VectorIdxPtr<Task>& task)
-    {
-        if(task == this)    return;
-        if(task == nullptr) return;
-        if(find_dependency(task) != nullptr) return;
-
-        if(task->find_cyclic_dependency(this) != nullptr)
-        {
-            printf("Circular Dependency Detected between %s and %s\n", m_name.c_str(), task->name().c_str());
-            return;
+            if(m_executor) return m_executor->clone();
+            else throw std::runtime_error("executor is Not Set\n");
         }
 
-        m_dependencies.emplace_back(task);
-    }
-
-    Stable_VectorIdxPtr<Task> find_dependency(const char* name) const
-    {
-        for(auto& dep : m_dependencies)
+        operator std::shared_ptr<executor_base> () const
         {
-            if(dep->name() == name)
+            if(m_executor) return m_executor;
+            else throw std::runtime_error("executor is Not Set\n");
+        }
+  
+        private:
+        std::shared_ptr<executor_base> m_executor;
+    };
+
+    class sequential_executor : public executor_base
+    {
+    public:
+        
+        void enqueue(std::vector<std::function<void()>>& tasks) override
+        {
+            for (auto& task : tasks)
             {
-                return dep;
+                task();
             }
         }
-        return nullptr;
-    }
 
-    Stable_VectorIdxPtr<Task> find_dependency(const Stable_VectorIdxPtr<Task>& task) const
-    {
-        auto it = std::find(m_dependencies.begin(), m_dependencies.end(), task);
-        if(it != m_dependencies.end())
+        static std::shared_ptr<executor_base> make()  
         {
-            return *it;
+            return std::make_shared<sequential_executor>();
         }
-        return nullptr;
-    }
 
-    Stable_VectorIdxPtr<Task> find_cyclic_dependency(const Task* task) const
-    {
-        for(auto& dep : m_dependencies)
+        std::shared_ptr<executor_base> clone() const override
         {
-            if(dep == task)
+            return std::make_shared<sequential_executor>(*this);
+        }
+        
+        ~sequential_executor() override  = default;
+    };
+
+    // Async executor uses Futures
+    class async_executor : public executor_base
+    {
+    public:
+        void enqueue(std::vector<std::function<void()>>& tasks) override
+        {
+            std::vector<std::future<void>> futures;
+        
+            for (auto &task : tasks)
             {
-                return dep;
+                futures.emplace_back(std::async(std::launch::async, task));
             }
-            else
+
+            for (auto &future : futures)
             {
-                auto cyclic_dep = dep->find_cyclic_dependency(task);
-                if(cyclic_dep != nullptr)
+                future.get();
+            }
+        }
+
+        static std::shared_ptr<executor_base> make()
+        {
+            return std::make_shared<async_executor>();
+        }
+
+        std::shared_ptr<executor_base> clone() const override
+        {
+            return std::make_shared<async_executor>(*this);
+        }
+
+        ~async_executor() override = default;
+    };
+
+
+    class Timer
+    {
+    public:
+        Timer() : m_start_time(std::chrono::steady_clock::now()) {}
+
+        double now() const
+        {
+            return std::chrono::duration<double>(std::chrono::steady_clock::now() - m_start_time).count();
+        }
+
+        void reset()
+        {
+            m_start_time = std::chrono::steady_clock::now();
+        }
+
+    private:
+        std::chrono::steady_clock::time_point m_start_time;
+    };
+
+    template <typename T>
+    class Stable_VectorIdxPtr
+    {
+    public:
+        Stable_VectorIdxPtr() : m_vec(nullptr), m_idx(0) {}
+        Stable_VectorIdxPtr(std::nullptr_t) : m_vec(nullptr), m_idx(0) {}
+
+        Stable_VectorIdxPtr(std::vector<T> &vec, size_t idx) : m_vec(&vec), m_idx(idx)
+        {
+            if (m_idx >= m_vec->size())
+            {
+                throw std::out_of_range("Index out of range");
+            }
+
+            if (m_vec->empty())
+            {
+                throw std::out_of_range("Vector is empty");
+            }
+        }
+
+        Stable_VectorIdxPtr(const Stable_VectorIdxPtr &other) : m_vec(other.m_vec), m_idx(other.m_idx) {}
+        Stable_VectorIdxPtr(Stable_VectorIdxPtr &&other) : m_vec(other.m_vec), m_idx(other.m_idx) {}
+
+        Stable_VectorIdxPtr &operator=(const Stable_VectorIdxPtr &other)
+        {
+            m_vec = other.m_vec;
+            m_idx = other.m_idx;
+            return *this;
+        }
+
+        Stable_VectorIdxPtr &operator=(Stable_VectorIdxPtr &&other)
+        {
+            m_vec = other.m_vec;
+            m_idx = other.m_idx;
+            return *this;
+        }
+
+        T *operator->() { return &(vec()->at(m_idx)); }
+        const T *operator->() const { return &(vec()->at(m_idx)); }
+
+        T &operator*() { return vec()->at(m_idx); }
+        const T &operator*() const { return vec()->at(m_idx); }
+
+        bool operator==(const Stable_VectorIdxPtr &other) const { return m_vec == other.m_vec && m_idx == other.m_idx; }
+        bool operator!=(const Stable_VectorIdxPtr &other) const { return !(*this == other); }
+
+        bool operator==(T *other) const { return &(vec()->at(m_idx)) == other; }
+        bool operator!=(T *other) const { return !(this == other); }
+
+        bool operator==(std::nullptr_t) const { return m_vec == nullptr; }
+        bool operator!=(std::nullptr_t) const { return m_vec != nullptr; }
+
+        operator T *() { return &(vec()->at(m_idx)); }
+        operator const T *() const { return &(vec()->at(m_idx)); }
+        operator bool() const { return vec() != nullptr; }
+
+        size_t index() const { return m_idx; }
+
+    private:
+        std::vector<T> *vec() const
+        {
+            if (m_vec == nullptr)
+            {
+                throw std::runtime_error("Null Pointer Acess In StableVectorIDXptr\n");
+            }
+            return m_vec;
+        }
+
+    private:
+        std::vector<T> *m_vec;
+        size_t m_idx;
+    };
+
+    class Task
+    {
+    public:
+        Task(const char *name, std::function<void()> func) : m_name(std::move(name)), m_func(std::move(func)), m_execution_status(false) {}
+
+        Task(const Task &other) : m_name(other.m_name), m_func(other.m_func), m_execution_status(other.m_execution_status.load()) {}
+        Task(Task &&other) : m_name(std::move(other.m_name)), m_func(std::move(other.m_func)), m_execution_status(other.m_execution_status.load()) {}
+
+        void add_dependency(Stable_VectorIdxPtr<Task> &task)
+        {
+            if (task == this)
+                return;
+            if (task == nullptr)
+                return;
+            if (find_dependency(task) != nullptr)
+                return;
+
+            if (task->find_cyclic_dependency(this) != nullptr)
+            {
+                printf("Circular Dependency Detected between %s and %s\n", m_name.c_str(), task->name().c_str());
+                return;
+            }
+
+            m_dependencies.emplace_back(task);
+        }
+
+        Stable_VectorIdxPtr<Task> find_dependency(const char *name) const
+        {
+            for (auto &dep : m_dependencies)
+            {
+                if (dep->name() == name)
                 {
-                    return cyclic_dep;
+                    return dep;
                 }
             }
+            return nullptr;
         }
-        return nullptr;
-    }
 
-    void remove_dependency(const Stable_VectorIdxPtr<Task>& task)
-    {
-        m_dependencies.erase(std::remove(m_dependencies.begin(), m_dependencies.end(), task), m_dependencies.end());
-    }
-
-    std::vector<Stable_VectorIdxPtr<Task>>& get_dependencies()             { return m_dependencies; }
-    const std::vector<Stable_VectorIdxPtr<Task>>& get_dependencies() const { return m_dependencies; }
-
-    bool ready() const
-    {
-        if(m_dependencies.empty())
+        Stable_VectorIdxPtr<Task> find_dependency(const Stable_VectorIdxPtr<Task> &task) const
         {
+            auto it = std::find(m_dependencies.begin(), m_dependencies.end(), task);
+            if (it != m_dependencies.end())
+            {
+                return *it;
+            }
+            return nullptr;
+        }
+
+        Stable_VectorIdxPtr<Task> find_cyclic_dependency(const Task *task) const
+        {
+            for (auto &dep : m_dependencies)
+            {
+                if (dep == task)
+                {
+                    return dep;
+                }
+                else
+                {
+                    auto cyclic_dep = dep->find_cyclic_dependency(task);
+                    if (cyclic_dep != nullptr)
+                    {
+                        return cyclic_dep;
+                    }
+                }
+            }
+            return nullptr;
+        }
+
+        void remove_dependency(const Stable_VectorIdxPtr<Task> &task)
+        {
+            m_dependencies.erase(std::remove(m_dependencies.begin(), m_dependencies.end(), task), m_dependencies.end());
+        }
+
+        std::vector<Stable_VectorIdxPtr<Task>> &get_dependencies() { return m_dependencies; }
+        const std::vector<Stable_VectorIdxPtr<Task>> &get_dependencies() const { return m_dependencies; }
+
+        bool ready() const
+        {
+            if (m_dependencies.empty())
+            {
+                return true;
+            }
+
+            for (auto &dep : m_dependencies)
+            {
+                if (!dep->is_executed())
+                {
+                    return false;
+                }
+            }
+
             return true;
         }
 
-        for(auto& dep : m_dependencies)
+        const std::string &name() const { return m_name; }
+
+        size_t get_dependency_count() const { return m_dependencies.size(); }
+
+        bool is_executed() const { return m_execution_status.load(); }
+        uint32_t execution_rank() const { return m_execution_rank; }
+
+        bool operator<(const Task &other) const
         {
-            if(!dep->is_executed())
+            return m_name < other.m_name;
+        }
+
+        bool operator==(const Task &other) const
+        {
+            return m_name == other.m_name;
+        }
+
+        bool operator<(const std::string &other) const
+        {
+            return m_name < other;
+        }
+
+        bool operator==(const std::string &other) const
+        {
+            return m_name == other;
+        }
+
+        bool operator==(const char *other) const
+        {
+            return m_name.compare(other) == 0;
+        }
+
+        void set_function(std::function<void()> func) { m_func = std::move(func); }
+
+    private:
+        friend class taskflowgraph;
+        bool execute(std::vector<std::string> &exceptions, std::map<std::string, std::pair<double, double>> &execution_times, const Timer &timer, std::atomic<uint32_t> &executed_task_rank)
+        {
+            if (m_execution_status.load())
             {
+                m_error_status.store(true);
+                return true;
+            }
+
+            double start_time = timer.now();
+
+            try
+            {
+                m_func();
+            }
+            catch (const std::exception &e)
+            {
+                exceptions.emplace_back((m_name + " threw exception: ") + e.what());
+                execution_times.erase(m_name);
+                m_error_status.store(true);
                 return false;
+            }
+            catch (...)
+            {
+                exceptions.emplace_back(m_name + " threw unknown exception.");
+                execution_times.erase(m_name);
+                m_error_status.store(true);
+                return false;
+            }
+
+            double end_time = timer.now();
+
+            m_execution_status.store(true);
+           
+            m_error_status.store(false);
+
+            // Rank the executed task on the basis of completion order
+            m_execution_rank = executed_task_rank.fetch_add(1);
+            
+            execution_times[m_name] = {start_time, end_time};
+
+            return true;
+        }
+
+        bool has_error() const { return m_error_status.load(); }
+
+    private:
+        std::string m_name;
+        std::function<void()> m_func;
+        mutable std::atomic<bool> m_execution_status;
+        std::atomic<bool> m_error_status;
+        uint32_t m_execution_rank;
+        std::vector<Stable_VectorIdxPtr<Task>> m_dependencies;
+    };
+
+    class taskflowgraph
+    {
+    public:
+        taskflowgraph() : m_tasks(), m_tasks_map(), m_executor(async_executor::make()), m_timer(), m_execution_times(), m_exceptions() {}
+        
+        void set_executor(executor executor)
+        {
+            m_executor = executor;
+        }
+
+        void add_task(const char *name, std::function<void()> func)
+        {
+            auto it = find_task(name);
+
+            if (it != nullptr)
+            {
+                it->set_function(func);
+                return;
+            }
+
+            m_tasks.emplace_back(name, func);
+            m_tasks_map.emplace(name, Stable_VectorIdxPtr<Task>(m_tasks, m_tasks.size() - 1));
+        }
+
+        Task* find_task(const char *name)
+        {
+            std::map<std::string, Stable_VectorIdxPtr<Task>>::iterator it = m_tasks_map.find(name);
+
+            if (it != m_tasks_map.end())
+            {
+                return it->second;
+            }
+
+            return nullptr;
+        }
+
+        Task* task(const char *name)
+        {
+            if (find_task(name) == nullptr)
+            {
+                std::string error = std::string("Task not found: ") + name;
+                throw std::runtime_error(error.c_str());
+            }
+
+            return find_task(name);
+        }
+
+        void add_dependency(const char *dependent_name, std::initializer_list<const char *> in_dependencies)
+        {
+            for (auto &dep : in_dependencies)
+            {
+                add_dependency(dependent_name, dep);
             }
         }
 
-        return true;
-    }
-
-    const std::string& name() const     { return m_name; }
-
-    size_t get_dependency_count() const { return m_dependencies.size(); }
-
-    bool is_executed() const { return m_execution_status.load(); }
-    uint32_t execution_rank() const { return m_execution_rank; }
-
-    bool operator<(const Task& other) const 
-    { return m_name < other.m_name; }
-
-    bool operator==(const Task& other) const 
-    { return m_name == other.m_name; }   
-
-    bool operator<(const std::string& other) const 
-    { return m_name < other; }
-
-    bool operator==(const std::string& other) const 
-    { return m_name == other; }
-
-    bool operator==(const char* other) const 
-    { return m_name.compare(other) == 0; }
-    
-    void set_function(std::function<void()> func) { m_func = std::move(func); }
-
-private:
-    friend class taskflowgraph;
-    bool execute(std::vector<std::string>& exceptions, std::map<std::string, std::pair<double, double>>& execution_times, const Timer& timer, std::atomic<uint32_t>& executed_task_rank)
-    {
-        if(m_execution_status.load())
+        void add_dependency(const char *dependent_name, const char *dependency_name)
         {
-            return true;
+            Stable_VectorIdxPtr<Task> &task = m_tasks_map[dependent_name];
+            Stable_VectorIdxPtr<Task> &dependency = m_tasks_map[dependency_name];
+            task->add_dependency(dependency);
         }
 
-        double start_time = timer.now();
-
-        try
+        void remove_dependency(const char *dependent_name, const char *dependency_name)
         {
-            m_func();  
-        }
-        catch (const std::exception &e)
-        {
-            exceptions.emplace_back((m_name + " threw exception: ") + e.what());
-            execution_times.erase(m_name);
-            return false;
-        }
-        catch (...)
-        {
-            exceptions.emplace_back(m_name + " threw unknown exception.");
-            execution_times.erase(m_name);
-            return false;
-        }
-        
-        double end_time = timer.now();
-        
-        m_execution_status.store(true);
-        
-        // Rank the executed task on the basis of completion order
-        m_execution_rank = executed_task_rank.fetch_add(1);
-        
-        execution_times[m_name] = { start_time, end_time };
-
-        return true;
-    }
-
-private:
-    std::string                m_name;
-    std::function<void()>      m_func;
-    mutable std::atomic<bool>  m_execution_status;
-    uint32_t                   m_execution_rank;
-    std::vector<Stable_VectorIdxPtr<Task>> m_dependencies;
-};
-
-
-class taskflowgraph
-{
-    public:
-    taskflowgraph() : m_tasks(), m_tasks_map(), m_timer(), m_execution_times(), m_exceptions() {}
-
-    void add_task(const char* name, std::function<void()> func)
-    {
-        auto it = find_task(name);
-
-        if(it != nullptr)
-        {
-           it->set_function(func);
-           return;
+            Stable_VectorIdxPtr<Task> &task = m_tasks_map[dependent_name];
+            Stable_VectorIdxPtr<Task> &dependency = m_tasks_map[dependency_name];
+            task->remove_dependency(dependency);
         }
 
-        m_tasks.emplace_back(name, func);
-        m_tasks_map.emplace(name, Stable_VectorIdxPtr<Task>(m_tasks, m_tasks.size() - 1));
-    }
-
-    Task* find_task(const char* name)
-    {
-        std::map<std::string, Stable_VectorIdxPtr<Task>>::iterator it = m_tasks_map.find(name);
-        
-        if(it != m_tasks_map.end())
+        void execute()
         {
-            return it->second;
-        }
+            std::atomic<uint32_t> executed_tasks_rank(0);
 
-        return nullptr;
-    } 
+            m_execution_times.clear();
+            
+            std::vector<std::function<void()>> curr_batch;
 
-    Task* task(const char* name)
-    {
-        if(find_task(name) == nullptr)
-        {
-            std::string error  = std::string("Task not found: ") + name;
-            throw std::runtime_error(error.c_str());       
-        }
-
-        return find_task(name);
-    }
-
-    void add_dependency(const char* dependent_name, std::initializer_list<const char*> in_dependencies)
-    {
-        for(auto& dep : in_dependencies)
-        {
-            add_dependency(dependent_name, dep);
-        }
-    }
-
-    void add_dependency(const char* dependent_name, const char* dependency_name)
-    {
-        Stable_VectorIdxPtr<Task>&  task       = m_tasks_map[dependent_name];
-        Stable_VectorIdxPtr<Task>&  dependency = m_tasks_map[dependency_name];
-        task->add_dependency(dependency);
-    }
-
-    void remove_dependency(const char* dependent_name, const char* dependency_name)
-    {
-        Stable_VectorIdxPtr<Task>&  task       = m_tasks_map[dependent_name];
-        Stable_VectorIdxPtr<Task>&  dependency = m_tasks_map[dependency_name];
-        task->remove_dependency(dependency);
-    }
-
-    void execute()
-    {
-        std::atomic<uint32_t> executed_tasks_rank(0);
-        
-        m_execution_times.clear();
-
-        while(all_tasks_executed() == false)
-        {
-            for(Task& task : m_tasks)
+            while (all_tasks_executed() == false)
             {
-                if(task.ready())
+                for (Task &task : m_tasks)
                 {
-                    bool task_status = task.execute(m_exceptions, m_execution_times, m_timer, executed_tasks_rank);
-                    if(!task_status)
+                    if(task.has_error())
                     {
                         print_exceptions();
                         return;
                     }
+
+                    if (!task.is_executed() && task.ready())
+                    {
+                        auto& rank  = executed_tasks_rank;
+                        curr_batch.emplace_back([this, &task, &rank]()
+                        {
+                            task.execute(m_exceptions, m_execution_times, m_timer, rank);
+                        });
+                    }
+                }
+
+                m_executor.enqueue(curr_batch);
+                curr_batch.clear();
+            }
+
+            printf("All Tasks Executed\n");
+        }
+
+        //+-------------------------------------------------------------------------------------------------+
+        // Performance tracking, Visualization, Error handling & Debugging
+        //+-------------------------------------------------------------------------------------------------+
+
+        // Export to Graphviz
+        void export_to_graphviz(const char *filename)
+        {
+            std::ofstream file(filename);
+            file << "digraph taskflowgraph {\n";
+
+            for (Task &task : m_tasks)
+            {
+                file << "  " << task.name() << " [label=\"" << task.name() << "\"];\n";
+
+                // Add execution time
+                std::map<std::string, std::pair<double, double>>::iterator it = m_execution_times.find(task.name());
+
+                if (it != m_execution_times.end())
+                {
+                    // Add Execution Time
+                    file << "  " << task.name() << " [label=\"" << task.name() << "\\n Rank-" << task.execution_rank() << "---> Time : " << it->second.first << "s - " << it->second.second << "s\"];\n";
+                }
+                else
+                {
+                    file << "  " << task.name() << " [label=\"" << task.name() << "\\n"
+                         << "Not Executed\"];\n";
+                }
+
+                for (Stable_VectorIdxPtr<Task> &dep : task.get_dependencies())
+                {
+                    file << "  " << dep->name() << " -> " << task.name() << ";\n";
                 }
             }
+
+            file << "}\n";
+            file.close();
+
+            system("dot -Tpng taskflow2.dot -o taskflow2.png");
         }
-    }
 
-    //+-------------------------------------------------------------------------------------------------+
-    // Performance tracking, Visualization, Error handling & Debugging
-    //+-------------------------------------------------------------------------------------------------+
+        // Error handling & Debugging
+        bool has_exceptions() const { return !(m_exceptions.empty()); }
 
-    // Export to Graphviz
-    void export_to_graphviz(const char* filename)
-    {
-        std::ofstream file(filename);
-        file << "digraph taskflowgraph {\n";
-        
-        for(Task& task : m_tasks)
+        const std::vector<std::string> &exceptions() const { return m_exceptions; }
+
+        void print_exceptions() const
         {
-            file << "  " << task.name()  << " [label=\"" << task.name() << "\"];\n";
-            // Add execution time
-            std::map<std::string, std::pair<double, double>>::iterator it = m_execution_times.find(task.name());
-
-            if(it  != m_execution_times.end()) {
-                // Add Execution Time
-                file << "  " << task.name() << " [label=\"" << task.name() << "\\n Rank-" << task.execution_rank() << "---> Time : " << it->second.first << "s - " << it->second.second << "s\"];\n";
-            }
-            else  
+            for (auto &exception : m_exceptions)
             {
-                file << "  " << task.name() << " [label=\"" << task.name() << "\\n" << "Not Executed\"];\n";
+                std::cout << exception << std::endl;
             }
+        }
 
-            for (Stable_VectorIdxPtr<Task> &dep : task.get_dependencies())
+        bool all_tasks_executed() const
+        {
+            for (auto &task : m_tasks)
             {
-                file << "  " << dep->name() << " -> " << task.name() << ";\n";
+                if (!task.is_executed())
+                {
+                    return false;
+                }
             }
+            return true;
         }
 
-        file << "}\n";
-        file.close();
-        std::string cmd = std::string("dot -Tpng taskflow2.dot -o ") + std::string(filename); 
-        system(cmd.c_str());
-    }
-
-    // Error handling & Debugging
-    bool  has_exceptions() const { return !(m_exceptions.empty()); }
-    
-    const std::vector<std::string>& exceptions() const { return m_exceptions; }
-
-    void print_exceptions() const
-    {
-        for(auto& exception : m_exceptions)
+        ~taskflowgraph()
         {
-            std::cout << exception << std::endl;
+            
         }
-    }
-
-    bool all_tasks_executed() const
-    {
-        for(auto& task : m_tasks)
-        {
-            if(!task.is_executed()) { return false; }
-        }
-        return true;
-    }
-    
-    ~taskflowgraph()
-    { }
 
     private:
-    std::vector<Task> m_tasks;
-    std::map<std::string, Stable_VectorIdxPtr<Task>> m_tasks_map;
-    
-    // Performance tracking
-    Timer m_timer;
-    std::map<std::string, std::pair<double, double>> m_execution_times;
+        std::vector<Task> m_tasks;
+        std::map<std::string, Stable_VectorIdxPtr<Task>> m_tasks_map;
 
-    // Error handling
-    std::vector<std::string> m_exceptions;
-};
+        // executor
+        executor m_executor;
+
+        // Performance tracking
+        Timer m_timer;
+        std::map<std::string, std::pair<double, double>> m_execution_times;
+
+        // Error handling
+        std::vector<std::string> m_exceptions;
+    };
 } // namespace gp_std
 #endif
