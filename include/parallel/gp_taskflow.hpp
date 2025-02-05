@@ -382,9 +382,16 @@ namespace gp_std
                 return true;
             }
 
+            // Wait For Dependencies and yield if taking too long
+            uint32_t spins = 0;
             while(!ready())
             {
-                // TODO: Yield after timeout 
+                if(spins > 100000)
+                {
+                    std::this_thread::yield();
+                    spins = 0;
+                }
+                ++spins;
             }
             
             double start_time = timer.now();
