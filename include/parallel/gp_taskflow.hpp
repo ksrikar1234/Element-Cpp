@@ -442,14 +442,14 @@ namespace gp_std
 
         void add_task(const char *name, std::function<void()> func)
         {
-            auto it = *(find_task(name));
-
+            auto it = (find_task(name));
             if (it != nullptr)
             {
-                it->set_function(func);
-                return;
+                if((*it) != nullptr) {
+                  (*it)->set_function(func);
+                  return;
+                }
             }
-
             m_tasks.emplace_back(name, func);
             m_tasks_map.emplace(name, Stable_VectorIdxPtr<Task>(m_tasks, m_tasks.size() - 1));
         }
