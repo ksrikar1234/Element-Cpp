@@ -5,10 +5,7 @@
 #include <fstream>
 
 #include <string>
-#include <cstring>
 #include <vector>
-#include <set>
-#include <queue>
 #include <map>
 
 #include <chrono>
@@ -19,9 +16,7 @@
 #include <functional>
 
 #include <thread>
-#include <mutex>
 #include <atomic>
-#include <condition_variable>
 #include <future>
 
 // Usage :
