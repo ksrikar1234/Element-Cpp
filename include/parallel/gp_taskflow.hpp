@@ -429,6 +429,7 @@ namespace gp_std
         std::vector<Stable_VectorIdxPtr<Task>> m_dependencies;
     };
 
+
     class taskflowgraph
     {
     public:
@@ -441,7 +442,7 @@ namespace gp_std
 
         void add_task(const char *name, std::function<void()> func)
         {
-            auto it = find_task(name);
+            auto it = *(find_task(name));
 
             if (it != nullptr)
             {
@@ -453,13 +454,13 @@ namespace gp_std
             m_tasks_map.emplace(name, Stable_VectorIdxPtr<Task>(m_tasks, m_tasks.size() - 1));
         }
 
-        Task* find_task(const char *name)
+        Stable_VectorIdxPtr<Task>* find_task(const char *name)
         {
             std::map<std::string, Stable_VectorIdxPtr<Task>>::iterator it = m_tasks_map.find(name);
 
             if (it != m_tasks_map.end())
             {
-                return it->second;
+                return &(it->second);
             }
 
             return nullptr;
@@ -473,7 +474,7 @@ namespace gp_std
                 throw std::runtime_error(error.c_str());
             }
 
-            return find_task(name);
+            return (*find_task(name));
         }
 
         void add_dependency(const char *dependent_name, std::initializer_list<const char *> in_dependencies)
@@ -486,16 +487,28 @@ namespace gp_std
 
         void add_dependency(const char *dependent_name, const char *dependency_name)
         {
-            Stable_VectorIdxPtr<Task> &task = m_tasks_map[dependent_name];
-            Stable_VectorIdxPtr<Task> &dependency = m_tasks_map[dependency_name];
-            task->add_dependency(dependency);
+            Stable_VectorIdxPtr<Task>* task       = find_task(dependent_name);
+            Stable_VectorIdxPtr<Task>* dependency = find_task(dependency_name);
+
+            if (task == nullptr || dependency == nullptr)
+            {
+                return;
+            }
+
+            (*task)->add_dependency((*dependency));
         }
 
         void remove_dependency(const char *dependent_name, const char *dependency_name)
         {
-            Stable_VectorIdxPtr<Task> &task = m_tasks_map[dependent_name];
-            Stable_VectorIdxPtr<Task> &dependency = m_tasks_map[dependency_name];
-            task->remove_dependency(dependency);
+            Stable_VectorIdxPtr<Task>* task       = find_task(dependent_name);
+            Stable_VectorIdxPtr<Task>* dependency = find_task(dependency_name);
+
+            if (task == nullptr || dependency == nullptr)
+            {
+                return;
+            }
+
+            (*task)->remove_dependency((*dependency));
         }
 
         void execute()
