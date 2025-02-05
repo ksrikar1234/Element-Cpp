@@ -261,8 +261,6 @@ namespace gp_std
                 return;
             if (task == nullptr)
                 return;
-            if (find_dependency(task) != nullptr)
-                return;
 
             if (task->find_cyclic_dependency(this) != nullptr)
             {
