@@ -25,8 +25,6 @@ namespace gp_std
 
 // Limitations:
 // Insertions are not allowed in the lookup table
-// The lookup table is not thread-safe yet but can be made thread-safe by using locks
-// Its
 
 // Usage:
 // --> Create a lookup table from a std::map or std::unordered_map
