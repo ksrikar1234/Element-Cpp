@@ -379,10 +379,14 @@ namespace gp_std
         {
             if (m_execution_status.load())
             {
-                m_error_status.store(true);
                 return true;
             }
 
+            while(!ready())
+            {
+                // TODO: Yield after timeout 
+            }
+            
             double start_time = timer.now();
 
             try
@@ -529,7 +533,7 @@ namespace gp_std
                         return;
                     }
 
-                    if (!task.is_executed() && task.ready())
+                    if (!task.is_executed())
                     {
                         auto& rank  = executed_tasks_rank;
                         curr_batch.emplace_back([this, &task, &rank]()
