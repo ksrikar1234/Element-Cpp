@@ -9,7 +9,9 @@
 
 namespace gp_std
 {
-
+//
+/// @brief template <typename Key, typename Value> 
+/// @brief class lookup_table
 // Primary API for lookup_table class. Go to this class for Actually using them
 // A lookup table is a read-only data structure that maps keys to values
 // Its Base Container is a std::vector of std::pair<Key, Value>
