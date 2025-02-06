@@ -378,18 +378,55 @@ namespace gp_std
             }
 
             // Wait For Dependencies and yield if taking too long
+            // Behave Like a Spin Lock for 100000 Spins
             uint32_t spins = 0;
             while(!ready())
             {
                 if(spins > 100000)
                 {
                     std::this_thread::yield();
-                    spins = 0;
+                    break;
                 }
                 ++spins;
             }
+
+            // After 100000 Spins, Sleep for 15ms on Linux and 50ms on Windows 
+
+            // For windows Time slice is 50ms - 5ms is used for spinning
+            // For Linux Time slice is 15ms  - 1 ms is used for spinning
+            uint32_t sleep_time = 1;
+            #ifdef _WIN32
+            sleep_time = 5;   
+            #endif
+
+            std::chrono::microseconds time_slice(sleep_time);
+
+            auto wait_start_time = std::chrono::high_resolution_clock::now();
+            auto wait_end_time = wait_start_time + time_slice;
             
-            double start_time = timer.now();
+            while(!ready())
+            {
+                if(std::chrono::high_resolution_clock::now() > wait_end_time)
+                {
+                    wait_end_time = std::chrono::high_resolution_clock::now() + time_slice;
+                    try
+                    {
+                        std::this_thread::sleep_for(std::chrono::microseconds(sleep_time*10));
+                    }
+                    catch (const std::exception &e)
+                    {
+                        exceptions.emplace_back((m_name + " threw exception: ") + e.what());
+                        m_error_status.store(true);
+                        return false;
+                    }
+                    catch (...)
+                    {
+                        exceptions.emplace_back(m_name + " threw unknown exception.");
+                        m_error_status.store(true);
+                        return false;
+                    }
+                }
+            }
 
             try
             {
