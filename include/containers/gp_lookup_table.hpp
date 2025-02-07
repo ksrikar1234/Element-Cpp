@@ -18,7 +18,7 @@ namespace gp_std
 // When a key is looked up, the table returns a pointer to the value
 
 // Advantages:
-// It provides fast lookups and is optimized for read-only use cases
+// It provides fast lookups and is optimized for no insertion further use cases
 // The lookup table can be created from a std::map or std::unordered_map
 // It supports both hash-based and tree-based lookup tables
 // It is a header-only library
