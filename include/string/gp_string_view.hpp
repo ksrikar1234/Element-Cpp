@@ -6,9 +6,17 @@
 #include <iostream>
 
 namespace gp_std
-{
+{    
+    // Forward declarations of the exposed classes
+
+    // Class representing a view of non-owning const string data
+    class const_string_view;
+
+    // Class representing a view of non-owning mutable string data
+    class string_view;
+
     ///*******************************************************************************************************************
-    // * const_string_view
+    // Class representing a view of non-owning const string data
     class const_string_view
     {
     public:
@@ -116,7 +124,7 @@ namespace gp_std
     };
 
     ///*******************************************************************************************************************
-    //* const_string_view
+    //* Class representing a view of non-owning mutable string data
     class string_view
     {
     public:
