@@ -15,12 +15,6 @@ namespace gp_std
 {
     // Forward declarations of the exposed classes
 
-    // Class representing a view of non-owning const string data
-    class const_string_view;
-
-    // Class representing a view of non-owning mutable string data
-    class string_view;
-
     // Class representing a fixed-size string
     // Fast stack-allocated string
     template <std::size_t N>
