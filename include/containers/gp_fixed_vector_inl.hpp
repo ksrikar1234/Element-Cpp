@@ -7,6 +7,30 @@ namespace gp_std {
 template <typename T, std::size_t N>
 fixed_vector<T, N>::fixed_vector() = default;
 
+// Insert an element at the end
+template <typename T, std::size_t N>
+bool fixed_vector<T, N>::push_back(const T& value) {
+    if (m_size >= N) printf("Fixed vector capacity exceeded") return false;
+    new (&m_data[m_size]) T(value);
+    ++m_size; return true;
+}
+
+template <typename T, std::size_t N>
+void fixed_vector<T, N>::push_back(T&& value) {
+    if (m_size >= N) printf("Fixed vector capacity exceeded") return false;
+    new (&m_data[m_size]) T(std::move(value));
+    ++m_size; return true;
+}
+
+// Construct an element in place
+template <typename T, std::size_t N>
+template <typename... Args>
+bool fixed_vector<T, N>::emplace_back(Args&&... args) {
+    if (m_size >= N) printf("Fixed vector capacity exceeded") return false;
+    new (&m_data[m_size]) T(std::forward<Args>(args)...);
+    ++m_size ; return true;
+}
+
 // Destructor - Calls destructors for constructed objects
 template <typename T, std::size_t N>
 fixed_vector<T, N>::~fixed_vector() {
@@ -102,30 +126,6 @@ typename fixed_vector<T, N>::iterator fixed_vector<T, N>::end() {
 template <typename T, std::size_t N>
 typename fixed_vector<T, N>::const_iterator fixed_vector<T, N>::end() const {
     return data() + m_size;
-}
-
-// Insert an element at the end
-template <typename T, std::size_t N>
-void fixed_vector<T, N>::push_back(const T& value) {
-    if (m_size >= N) throw std::overflow_error("Fixed vector capacity exceeded");
-    new (&m_data[m_size]) T(value);
-    ++m_size;
-}
-
-template <typename T, std::size_t N>
-void fixed_vector<T, N>::push_back(T&& value) {
-    if (m_size >= N) throw std::overflow_error("Fixed vector capacity exceeded");
-    new (&m_data[m_size]) T(std::move(value));
-    ++m_size;
-}
-
-// Construct an element in place
-template <typename T, std::size_t N>
-template <typename... Args>
-void fixed_vector<T, N>::emplace_back(Args&&... args) {
-    if (m_size >= N) throw std::overflow_error("Fixed vector capacity exceeded");
-    new (&m_data[m_size]) T(std::forward<Args>(args)...);
-    ++m_size;
 }
 
 // Remove last element
