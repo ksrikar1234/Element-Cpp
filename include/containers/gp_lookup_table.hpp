@@ -169,7 +169,7 @@ public:
 
     Value* lookup(const Key& key) const override
     {
-        size_t key_hash = std::hash<Key>{}(key);
+        size_t key_hash = Hash<Key>{}(key);
 
         auto it = std::lower_bound(m_hashes.begin(), m_hashes.end(), key_hash);
         
@@ -206,7 +206,7 @@ public:
 
         for (const auto &entry : data)
         {
-            size_t hash_value = std::hash<Key>{}(entry.first);
+            size_t hash_value = Hash<Key>{}(entry.first);
             this->m_table.emplace_back(std::move(entry.first), std::move(entry.second));
             m_hashes.push_back(hash_value);
         }
@@ -220,7 +220,7 @@ public:
 
         for (const auto &entry : data)
         {
-            size_t hash_value = std::hash<Key>{}(entry.first);
+            size_t hash_value = Hash<Key>{}(entry.first);
             this->m_table.emplace_back((entry.first), (entry.second));
             m_hashes.push_back(hash_value);
         }
@@ -237,7 +237,7 @@ public:
         m_hashes.reserve(size);
 
         while (begin != end) {
-            size_t hash_value = std::hash<Key>{}(begin->first);
+            size_t hash_value = Hash<Key>{}(begin->first);
             this->m_table.emplace_back(begin->first, begin->second);
             m_hashes.push_back(hash_value);
             ++begin;
