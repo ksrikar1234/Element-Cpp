@@ -415,13 +415,13 @@ namespace gp_std
                     }
                     catch (const std::exception &e)
                     {
-                        exceptions.emplace_back((m_name + " threw exception: ") + e.what());
+                        exceptions.emplace_back(std::string("sleep_for() threw exception: ") + e.what());
                         m_error_status.store(true);
                         return false;
                     }
                     catch (...)
                     {
-                        exceptions.emplace_back(m_name + " threw unknown exception.");
+                        exceptions.emplace_back("sleep_for() threw exception.");
                         m_error_status.store(true);
                         return false;
                     }
