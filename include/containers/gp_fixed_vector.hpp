@@ -4,7 +4,6 @@
 #include <iostream>
 #include <stdexcept>
 #include <type_traits>
-#include <iterator>
 #include <utility>
 
 namespace gp_std {
@@ -26,10 +25,13 @@ public:
     using const_iterator = const T*;
 
     fixed_vector();
-    ~fixed_vector();
+   ~fixed_vector();
 
-    fixed_vector(const fixed_vector&) = delete;
-    fixed_vector& operator=(const fixed_vector&) = delete;
+    fixed_vector(const fixed_vector& other);
+    fixed_vector& operator=(const fixed_vector& other);
+
+    fixed_vector(fixed_vector&& other);
+    fixed_vector& operator=(fixed_vector&& other);
 
     bool push_back(const T& value);
     bool push_back(T&& value);
@@ -37,7 +39,9 @@ public:
     template <typename... Args>
     bool emplace_back(Args&&... args);
 
-    void resize(size_t new_size);
+    template <typename... Args>
+    void resize(size_t new_size, Args&&... args) 
+
     void clear();
 
     constexpr size_type capacity() const;
@@ -62,12 +66,9 @@ public:
     iterator end();
     const_iterator end() const;
 
-
-
     void pop_back();
     iterator erase(iterator pos);
     iterator erase(iterator first, iterator last);
-
 };
 
 } // namespace gp_std
