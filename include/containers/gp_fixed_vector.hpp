@@ -37,6 +37,9 @@ public:
     template <typename... Args>
     bool emplace_back(Args&&... args);
 
+    void resize(size_t new_size);
+    void clear();
+
     constexpr size_type capacity() const;
     size_type size() const;
     bool empty() const;
@@ -64,7 +67,7 @@ public:
     void pop_back();
     iterator erase(iterator pos);
     iterator erase(iterator first, iterator last);
-    void clear();
+
 };
 
 } // namespace gp_std
