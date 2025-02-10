@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <cstdlib>
 
 #include <string>
 #include <vector>
@@ -595,9 +596,10 @@ namespace gp_std
         //+-------------------------------------------------------------------------------------------------+
 
         // Export to Graphviz
-        void export_to_graphviz(const char *filename)
-        {
-            std::ofstream file(filename);
+        void export_to_graphviz(const char* filename)
+        {  
+            std::string dot_file_name(std::string(filename) + std::string(".dot"));
+            std::ofstream file(.c_str());
             file << "digraph taskflowgraph {\n";
 
             for (Task &task : m_tasks)
@@ -627,7 +629,10 @@ namespace gp_std
             file << "}\n";
             file.close();
 
-            system("dot -Tpng taskflow2.dot -o taskflow2.png");
+
+            std::string out_png_file(std::string(filename) + std::string(".png"));
+            std::string cmd = std::string("dot -Tpng ") + dot_file_name + std::string("-o ") + out_png_file;
+            system(cmd.c_str());
         }
 
         // Error handling & Debugging
