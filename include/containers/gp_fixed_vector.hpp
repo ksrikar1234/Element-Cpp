@@ -31,6 +31,12 @@ public:
     fixed_vector(const fixed_vector&) = delete;
     fixed_vector& operator=(const fixed_vector&) = delete;
 
+    bool push_back(const T& value);
+    bool push_back(T&& value);
+    
+    template <typename... Args>
+    bool emplace_back(Args&&... args);
+
     constexpr size_type capacity() const;
     size_type size() const;
     bool empty() const;
@@ -53,11 +59,7 @@ public:
     iterator end();
     const_iterator end() const;
 
-    void push_back(const T& value);
-    void push_back(T&& value);
-    
-    template <typename... Args>
-    void emplace_back(Args&&... args);
+
 
     void pop_back();
     iterator erase(iterator pos);
