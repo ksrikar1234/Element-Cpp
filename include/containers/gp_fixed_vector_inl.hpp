@@ -37,6 +37,54 @@ fixed_vector<T, N>::~fixed_vector() {
     clear();
 }
 
+// Copy Constructor
+template <typename T, std::size_t N>
+fixed_vector<T, N>::fixed_vector(const fixed_vector& other) {
+    for (size_type i = 0; i < other.m_size; ++i) {
+        new (&m_data[i]) T(other[i]);  // Copy construct each element
+    }
+    m_size = other.m_size;
+}
+
+// Copy Assignment Operator
+template <typename T, std::size_t N>
+fixed_vector<T, N>& fixed_vector<T, N>::operator=(const fixed_vector& other) {
+    if (this != &other) {
+        clear();
+        for (size_type i = 0; i < other.m_size; ++i) {
+            new (&m_data[i]) T(other[i]);  // Copy construct each element
+        }
+        m_size = other.m_size;
+    }
+    return *this;
+}
+
+// Move Constructor
+template <typename T, std::size_t N>
+fixed_vector<T, N>::fixed_vector(fixed_vector&& other) noexcept {
+    for (size_type i = 0; i < other.m_size; ++i) {
+        new (&m_data[i]) T(std::move(other[i]));  // Move construct elements
+    }
+    m_size = other.m_size;
+    other.m_size = 0;  // Reset source
+    other.clear();
+}
+
+// Move Assignment Operator
+template <typename T, std::size_t N>
+fixed_vector<T, N>& fixed_vector<T, N>::operator=(fixed_vector&& other) noexcept {
+    if (this != &other) {
+        clear();
+        for (size_type i = 0; i < other.m_size; ++i) {
+            new (&m_data[i]) T(std::move(other[i]));  // Move construct elements
+        }
+        m_size = other.m_size;
+        other.m_size = 0;  // Reset source
+        other.clear();
+    }
+    return *this;
+}
+
 // Capacity
 template <typename T, std::size_t N>
 constexpr typename fixed_vector<T, N>::size_type fixed_vector<T, N>::capacity() const {
