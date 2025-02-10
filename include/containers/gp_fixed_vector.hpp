@@ -67,6 +67,6 @@ public:
 
 } // namespace gp_std
 
-#include "gp_fixed_vector.inl"  // Inline definitions
+#include "gp_fixed_vector_inl.hpp"  // Inline definitions
 
 #endif // GP_FIXED_VECTOR_H
