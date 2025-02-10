@@ -132,7 +132,7 @@ typename fixed_vector<T, N>::const_iterator fixed_vector<T, N>::end() const {
 template <typename T, std::size_t N>
 void fixed_vector<T, N>::pop_back() {
     if (m_size == 0) throw std::underflow_error("Fixed vector is empty");
-    reinterpret_cast<T*>(&m_data[--m_size])->~T();
+    reinterpret_cast<T*>(&m_data[--(m_size)])->~T();
 }
 
 // Remove an element at an iterator position
@@ -153,6 +153,29 @@ void fixed_vector<T, N>::clear() {
     }
     m_size = 0;
 }
+
+template <typename T, std::size_t N>
+template <typename... Args>
+void fixed_vector<T, N>::resize(size_t new_size, Args&&... args) {
+    if(new_size > N) printf("Invalid resize !! Greater than Capacity %lu", size());
+        return;
+    
+    if(new_size = m_size) return;
+    
+    else if(new_size < m_size)  
+    {   
+       for(size_type i = new_size; i < m_size; ++i) 
+           reinterpret_cast<T*>(&(m_data[i]))->~T(); 
+    }
+    else (new_size > m_size)
+    {
+        for(size_type i = m_size ; i < new_size; ++i)
+            new (&m_data[i]) T(std::forward<Args>(args)...);
+    }
+    
+    m_size = new_size;
+}
+
 
 } // namespace gp_std
 
