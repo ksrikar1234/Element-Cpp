@@ -411,6 +411,7 @@ namespace gp_std
                     wait_end_time = std::chrono::high_resolution_clock::now() + time_slice;
                     try
                     {
+                        std::this_thread::yield();
                         std::this_thread::sleep_for(std::chrono::microseconds(sleep_time*10));
                     }
                     catch (const std::exception &e)
