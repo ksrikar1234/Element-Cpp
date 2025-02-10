@@ -9,7 +9,7 @@
 #include <string>
 #include <deque>
 
-#include "gp_string_view.hpp
+#include "gp_string_view.hpp"
 
 namespace gp_std
 {
