@@ -13,12 +13,10 @@
 #include <thread>
 #include <future>
 
-#include "gp_callable.hpp"
+#include "../function/gp_function_ref.hpp"
 
 namespace gp_std
 {
-
-
 // int main()
 // { 
 
@@ -26,7 +24,7 @@ namespace gp_std
 //     std::vector<int> data;
 //     gp_stream<int> stream(data);
 
-/// ----> Create the callable objects
+/// ----> Create the function_ref objects
 
 //     auto print = [](int& x) { std::cout << x <<"\n"; };
 //     auto is_even([](const int &x) -> bool  { return x % 2 == 0; });
@@ -43,22 +41,12 @@ namespace gp_std
 //                         transform(square).
 //                         for_each(print).
 //                         map(add_one).
-//                         execute_async("Simple Printer", []() 
-//                         {
-//                             std::this_thread::sleep_for(std::chrono::seconds(1));
-//                             std::cout << "Transformed\n"; 
-//                         }).
-//                         execute_async("Do Something", []() 
-//                         {
-//                             std::this_thread::sleep_for(std::chrono::seconds(1));
-//                              std::cout << "Do Something\n"; 
-//                         }).
 //                         parallel_reduce(add, 0);
 
 
 //     printf("\nFiltered : %d\n", filtered_data);                       
+//     printf("2");                     
 //     return 0;
-
 
 
 /// @brief Stream API for C++ similar to Java Stream API
@@ -82,28 +70,28 @@ public:
     // +-----------------------------------------------------------------------------------------------------------------+
 
     // For Filter Operation
-    using Predicate = callable<bool(const T&)>;  // (Promising no modification of the stream elements)
+    using Predicate = function_ref<bool(const T&)>;  // (Promising no modification of the stream elements)
   
     // For Reduce Operation
-    using Accumulator = callable<T(const T&, const T&)>;  // Promising no modification of the stream elements
+    using Accumulator = function_ref<T(const T&, const T&)>;  // Promising no modification of the stream elements
 
     // For Map Operation 
-    using Mapper = callable<T(const T&)>;  // (Promising no modification of the stream elements)
+    using Mapper = function_ref<T(const T&)>;  // (Promising no modification of the stream elements)
 
     // For TypeMap Operation
     template <typename NewType>
-    using TypeMapper = callable<NewType(const T&)>;  // (Promising no modification of the stream elements)
+    using TypeMapper = function_ref<NewType(const T&)>;  // (Promising no modification of the stream elements)
 
     // For Transform Operation
-    using Transformer = callable<void(T&)>;  // (Mostly for modifying the stream elements)
+    using Transformer = function_ref<void(T&)>;  // (Mostly for modifying the stream elements)
 
     // For ForEach Operation 
-    using Action = callable<void(T&)>;                  
-    using ConstAction = callable<void(const T&)>;  // (Promising no modification)    
+    using Action = function_ref<void(T&)>;                  
+    using ConstAction = function_ref<void(const T&)>;  // (Promising no modification)    
     
     // For For in Range Operation
-    using RangeAction = callable<void(T&, Index_Type)>;
-    using ConstRangeAction = callable<void(const T&, Index_Type)>;  // (Promising no modification)
+    using RangeAction = function_ref<void(T&, Index_Type)>;
+    using ConstRangeAction = function_ref<void(const T&, Index_Type)>;  // (Promising no modification)
 
     // +-----------------------------------------------------------------------------------------------------------------+
     // | Constructors                                                                                                    |
@@ -116,7 +104,7 @@ public:
     
     Stream(const Stream_Type &other) : m_data(other.m_data) {}
 
-    Stream(Stream_Type &&other) : m_data(std::move(other.m_data)) , m_futures(std::move(other.m_futures)) {}
+    Stream(Stream_Type &&other) : m_data(std::move(other.m_data)) {}
 
     Stream(const ContainerType &data) : m_data(data)       {}
     Stream(ContainerType &&data) : m_data(std::move(data)) {}
@@ -124,14 +112,9 @@ public:
     
     ~Stream()
     {
-        for(auto& future : m_futures)
-        {
-            future.wait();
-        }
-
         for(auto& exception : m_exceptions)
         {
-           printf("Exception caught in Stream destructor: %s\n", exception.c_str());
+           printf("Exception caught in Stream : %s\n", exception.c_str());
         }
     }
 
@@ -145,8 +128,26 @@ public:
     Stream& operator=(Stream_Type &&other)
     {
         m_data = std::move(other.m_data);
-        m_futures = std::move(other.m_futures);
         m_exceptions = std::move(other.m_exceptions);
+        return *this;
+    }
+
+    Stream_Type& concat(const Stream_Type& other)
+    {
+        m_data.insert(m_data.end(), other.m_data.begin(), other.m_data.end());
+        return *this;
+    }
+
+    Stream_Type& concat(Stream_Type&& other)
+    {
+        m_data.insert(m_data.end(), std::make_move_iterator(other.m_data.begin()), std::make_move_iterator(other.m_data.end()));
+        return *this;
+    }
+
+    template <typename InputIt>
+    Stream_Type& concat(InputIt first, InputIt last)
+    {
+        m_data.insert(m_data.end(), first, last);
         return *this;
     }
 
@@ -156,7 +157,13 @@ public:
         m_data.clear();
         std::move(first, last, std::back_inserter(m_data));
     }
-    
+
+    // Collect: collects the elements into a standard base container of the Stream (By default it is std::vector)
+    ContainerType collect() const
+    {
+        return m_data;
+    }
+
     T& operator[](Index_Type index) { return m_data[index]; }
     const T& operator[](Index_Type index) const { return m_data[index]; }
 
@@ -166,23 +173,15 @@ public:
     ///| Stream Operations                                                                                               |
     ///+-----------------------------------------------------------------------------------------------------------------+
     
-    Stream_Type& broadcast(const T& value)
+    void broadcast(const T& value)
     {
         for (auto& elem : m_data) { elem = value;}
-        return this;
     }
 
-    Stream_Type& parallel_broadcast(const T& value)
+    void parallel_broadcast(const T& value)
     {
-
         int num_threads = std::thread::hardware_concurrency();
         int work_per_thread = m_data.size() / num_threads;
-        
-        if(m_data.size() < num_threads*1000)
-        {
-            return broadcast(value);
-        }
-
         std::vector<std::future<void>> futures;
 
         for (int i = 0; i < num_threads; ++i)
@@ -213,8 +212,6 @@ public:
         {
             future.wait();
         }
-
-        return *this;
     }
 
     // Filter: retains only elements that satisfy the predicate
@@ -520,109 +517,14 @@ public:
         }
         return *this;
     }
-
-    Stream_Type& concat(const Stream_Type& other)
-    {
-        m_data.insert(m_data.end(), other.m_data.begin(), other.m_data.end());
-        return *this;
-    }
-
-    Stream_Type& concat(Stream_Type&& other)
-    {
-        m_data.insert(m_data.end(), std::make_move_iterator(other.m_data.begin()), std::make_move_iterator(other.m_data.end()));
-        return *this;
-    }
-
-
-    template <typename InputIt>
-    Stream_Type& concat(InputIt first, InputIt last)
-    {
-        m_data.insert(m_data.end(), first, last);
-        return *this;
-    }
-
-    // Collect: collects the elements into a standard base container of the Stream (By default it is std::vector)
-    ContainerType collect() const
-    {
-        return m_data;
-    }
-
-    // Execute any type of function not necessarily modifying the elements
-    // Just for chaining purposes : Stream.execute([&]() { /* Do something */ });
-    template <typename VoidFunction>
-    Stream_Type& execute(const char* TaskName, VoidFunction&& function)
-    {
-        printf("Executing Task : %s\n", TaskName);
-        try
-        {
-            function();
-        }
-        catch (const std::exception& e)
-        {
-            printf("Exception caught in Stream.execute: %s\n", e.what());
-            m_exceptions.emplace_back(e.what());
-        }
-        catch (...)
-        {
-            printf("Unknown exception caught in Stream.execute\n");
-            m_exceptions.emplace_back("Unknown Exception");
-        }
-
-        return *this;
-    }
-
-    // AsyncExecute any type of function not necessarily modifying the elements
-    // Just for chaining purposes : Stream.async_execute([&]() { /* Do something */ });
-    template <typename VoidFunction>
-    Stream_Type& execute_async(const char* TaskName, VoidFunction&& function) 
-    {
-        m_futures.emplace_back(std::async(std::launch::async, [&, TaskName]()
-        {
-            printf("Executing Task : %s\n", TaskName);
-            try
-            {
-                function();
-            }
-            catch (const std::exception& e)
-            {
-                printf("Exception caught in Stream.execute_async: %s\n", e.what());
-                m_exceptions.emplace_back(e.what());
-            }
-            catch (...)
-            {
-                printf("Unknown exception caught in Stream.execute_async\n");
-                m_exceptions.emplace_back("Unknown Exception");
-            }
-        }));
-        return *this;
-    }
-
-    void wait()
-    {
-        for (auto& future : m_futures)
-        {
-            future.wait();
-        }
-        m_futures.clear();
-    }
-
-    template <typename ReturnType, typename... Args>
-    Stream_Type& execute_async(callable<ReturnType(Args...)> func, Args... args)
-    {
-        m_futures.emplace_back(std::async(std::launch::async, func, args...));
-        return *this;
-    }
-
 private:
     ContainerType m_data;
-    std::vector<std::future<void>> m_futures;
     std::vector<std::string> m_exceptions;
-
-    // For Acessing Original Stream during chaining store the previous Stream pointer
-    Stream_Type* m_prev_stream = nullptr;
 };
 
 } // namespace gp_std
 
 template <typename T, template <typename, typename> class Container = std::vector, typename Allocator = std::allocator<T>>
 using gp_stream = gp_std::Stream<T, Container, Allocator>;  
+
+#endif
