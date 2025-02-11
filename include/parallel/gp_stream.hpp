@@ -119,13 +119,13 @@ public:
     }
 
 
-    Stream& operator=(const Stream_Type &other)
+    Stream_Type& operator=(const Stream_Type &other)
     {
         m_data = other.m_data;
         return *this;
     }
 
-    Stream& operator=(Stream_Type &&other)
+    Stream_Type& operator=(Stream_Type &&other)
     {
         m_data = std::move(other.m_data);
         m_exceptions = std::move(other.m_exceptions);
@@ -173,12 +173,13 @@ public:
     ///| Stream Operations                                                                                               |
     ///+-----------------------------------------------------------------------------------------------------------------+
     
-    void broadcast(const T& value)
+    Stream_Type& broadcast(const T& value)
     {
         for (auto& elem : m_data) { elem = value;}
+        return *this;
     }
 
-    void parallel_broadcast(const T& value)
+    Stream_Type& parallel_broadcast(const T& value)
     {
         int num_threads = std::thread::hardware_concurrency();
         int work_per_thread = m_data.size() / num_threads;
@@ -212,6 +213,8 @@ public:
         {
             future.wait();
         }
+        
+        return *this;
     }
 
     // Filter: retains only elements that satisfy the predicate
@@ -230,12 +233,13 @@ public:
         ContainerType filtered;
         int num_threads = std::thread::hardware_concurrency();
         int work_per_thread = m_data.size() / num_threads;
-        std::vector<std::future<void>> futures;
+        std::vector<std::future<ContainerType>> futures;
 
         for (int i = 0; i < num_threads; ++i)
         {
-            futures.emplace_back(std::async(std::launch::async, [&, i]()
+            futures.emplace_back(std::async(std::launch::async, [&, i]() -> ContainerType
             {
+                ContainerType local_filtered;
                 int start = i * work_per_thread;
                 int end = (i == num_threads - 1) ? m_data.size() : start + work_per_thread;
                 for (int j = start; j < end; ++j)
@@ -244,7 +248,7 @@ public:
                     {
                         if (predicate(m_data[j]))
                         {
-                            filtered.push_back(m_data[j]);
+                            local_filtered.push_back(m_data[j]);
                         }
                     }
                     catch (const std::exception& e)
@@ -256,12 +260,14 @@ public:
                         printf("Unknown exception caught in Stream.parallel_filter\n");
                     }
                 }
+                return local_filtered;
             }));
         }
-
+        
         for (auto& future : futures)
         {
-            future.wait();
+            ContainerType local = future.get();
+            filtered.insert(filtered.end(), local.begin(), local.end());
         }
 
         return Stream_Type(std::move(filtered));
