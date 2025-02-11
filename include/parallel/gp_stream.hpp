@@ -118,7 +118,6 @@ public:
         }
     }
 
-
     Stream_Type& operator=(const Stream_Type &other)
     {
         m_data = other.m_data;
