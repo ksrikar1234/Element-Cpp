@@ -1,7 +1,6 @@
 #ifndef GP_FIXED_VECTOR_H
 #define GP_FIXED_VECTOR_H
 
-#include <iostream>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
