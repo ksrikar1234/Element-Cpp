@@ -6,7 +6,6 @@
 
 namespace gp_std
 {
-    // Copies the object when a non const method to acess the object is called
     #define GP_FAIL(msg) assert(false && msg)
 
     template <typename T>
@@ -408,8 +407,6 @@ namespace gp_std
         }
         return *get();
     }
-
-
 } // namespace gp_std
 
 #endif // _GP_STD_RUST_BOX_HPP_
