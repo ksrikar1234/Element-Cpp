@@ -44,13 +44,13 @@ namespace gp_std
 
         shared& operator=(const T& value)
         {
-            emplace(value);
+            if(m_ptr) *m_ptr = value; else emplace(value);
             return *this;
         }
 
         shared& operator=(T&& value)
         {
-            emplace(std::move(value));
+            if(m_ptr) *m_ptr = std::move(value); else emplace(std::move(value));
             return *this;
         }
 
