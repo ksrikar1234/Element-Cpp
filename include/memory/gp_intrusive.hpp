@@ -8,7 +8,6 @@
 
 namespace gp_std
 {
-
     template <typename T>
     class intrusive_ptr; // Forward declaration
 
@@ -61,7 +60,7 @@ namespace gp_std
         intrusive_ptr() noexcept : ptr_(nullptr) {}
 
         /// @brief Constructs an intrusive_ptr with a nullptr
-        intrusive_ptr(T *heap_allocated_resource) noexcept : ptr_(heap_allocated_resource)
+        intrusive_ptr(T* heap_allocated_resource) noexcept : ptr_(heap_allocated_resource)
         {
             if (ptr_)
             {
@@ -69,7 +68,7 @@ namespace gp_std
             }
         }
 
-        intrusive_ptr(const intrusive_ptr &other) noexcept : ptr_(other.ptr_)
+        intrusive_ptr(const intrusive_ptr& other) noexcept : ptr_(other.ptr_)
         {
             if (ptr_)
             {
@@ -77,12 +76,12 @@ namespace gp_std
             }
         }
 
-        intrusive_ptr(intrusive_ptr &&other) noexcept : ptr_(other.ptr_)
+        intrusive_ptr(intrusive_ptr&& other) noexcept : ptr_(other.ptr_)
         {
             other.ptr_ = nullptr;
         }
 
-        intrusive_ptr &operator=(const intrusive_ptr &other) noexcept
+        intrusive_ptr &operator=(const intrusive_ptr& other) noexcept
         {
             if (this != &other)
             {
@@ -101,7 +100,7 @@ namespace gp_std
             return *this;
         }
 
-        intrusive_ptr &operator=(intrusive_ptr &&other) noexcept
+        intrusive_ptr &operator=(intrusive_ptr&& other) noexcept
         {
             if (this != &other)
             {
@@ -123,17 +122,17 @@ namespace gp_std
             }
         }
 
-        T *get() const noexcept
+        T* get() const noexcept
         {
             return ptr_;
         }
 
-        T &operator*() const noexcept
+        T& operator*() const noexcept
         {
             return *ptr_;
         }
 
-        T *operator->() const noexcept
+        T* operator->() const noexcept
         {
             return ptr_;
         }
@@ -155,7 +154,7 @@ namespace gp_std
 
         void swap(intrusive_ptr &other) noexcept
         {
-            T *temp = ptr_;
+            T* temp = ptr_;
             ptr_ = other.ptr_;
             other.ptr_ = temp;
         }
@@ -166,7 +165,7 @@ namespace gp_std
         }
 
     private:
-        T *ptr_;
+        T* ptr_;
     };
 }
 #endif // _GP_INTRUSIVE_HPP
