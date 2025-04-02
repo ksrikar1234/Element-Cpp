@@ -77,9 +77,9 @@ namespace gp_std
             if(m_executor) m_executor->enqueue(tasks);
         }
 
-        std::shared_ptr<executor_base> clone() const
+        executor clone() const
         {
-            if(m_executor) return m_executor->clone();
+            if(m_executor) return executor(m_executor->clone());
             else throw std::runtime_error("executor is Not Set\n");
         }
 
