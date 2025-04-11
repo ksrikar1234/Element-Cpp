@@ -64,13 +64,6 @@ class base_lookup_table
 {
 protected:
     std::vector<std::pair<Key, Value>> m_table;
-    enum class table_type : uint8_t
-    {
-        hash_table = 0,
-        tree_table = 1
-    };
-    
-    table_type m_type;
 
 public:
     virtual ~base_lookup_table() = default;
@@ -127,15 +120,9 @@ public:
         return !(*this == other);
     }
 
-    bool is_tree_table() const
-    {
-        return m_type == table_type::tree_table;
-    }
+    virtual bool is_tree_table() const = 0;
 
-    bool is_hash_table() const
-    {
-        return m_type == table_type::hash_table;
-    }
+    virtual bool is_hash_table() const = 0;
 
     virtual std::shared_ptr<base_lookup_table<Key, Value>> clone() const = 0;
 };
@@ -268,6 +255,10 @@ public:
         this->m_table = std::move(sorted_table);
         m_hashes = std::move(sorted_hashes);
     }
+
+    bool is_tree_table() const override final { return false; }
+
+    bool is_hash_table() const override final { return true;  }
 };
 
 // Tree-based lookup table
@@ -327,6 +318,11 @@ public:
     {
         return std::make_shared<lookup_treetable<Key, Value>>(*this);
     }
+
+    bool is_tree_table() const override final { return true; }
+
+    bool is_hash_table() const override final { return false;  }
+
 };
 } // namespace gp_private
 
@@ -349,6 +345,7 @@ public:
     explicit lookup_table(const std::unordered_map<Key, Value, Hash, KeyEqual, Allocator>& data)
     {
         m_table = std::make_shared<gp_private::lookup_hashtable<Key, Value, Hash, KeyEqual, Allocator>>(data);
+        m_table_type = 
     }
 
     template <typename Hash = std::hash<Key>, typename KeyEqual = std::equal_to<Key>, typename Allocator = std::allocator<std::pair<const Key, Value>>>
