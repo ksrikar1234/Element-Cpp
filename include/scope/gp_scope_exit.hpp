@@ -10,7 +10,7 @@ namespace gp_std
     // auto file = load_file("file"); 
     // auto file_closer = gp_std::scope_exit([&file] { file.close });
     template <typename Callable>
-    scope_exit_guard<Callable> scope_exit(Callable &&func);
+    inline scope_exit_guard<Callable> scope_exit(Callable &&func);
 
     template <typename Callable>
     class scope_exit_guard
@@ -60,7 +60,7 @@ namespace gp_std
     };
 
     template <typename Callable>
-    scope_exit_guard<Callable> scope_exit(Callable &&func)
+    inline scope_exit_guard<Callable> scope_exit(Callable &&func)
     {
         return scope_exit_guard<Callable>(std::forward<Callable>(func));
     }
