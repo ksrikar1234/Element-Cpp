@@ -3,14 +3,10 @@
 #include <initializer_list>
 #include <algorithm>
 #include <stdexcept>
-#pragma once
-
 #include <cstddef>
 #include <new>
 #include <utility>
 #include <type_traits>
-#include <algorithm>
-#include <stdexcept>
 
 namespace gp_std
 {
