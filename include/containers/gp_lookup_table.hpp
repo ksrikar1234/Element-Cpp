@@ -24,7 +24,7 @@ namespace gp_std
 // It is a header-only library
 
 // Limitations:
-// Insertions are not allowed in the lookup table
+// Insertions are not allowed in the lookup table but values can be modified
 
 // Usage:
 // --> Create a lookup table from a std::map or std::unordered_map
