@@ -41,7 +41,19 @@ namespace gp_std
             { if(i > 0) return false; }
             return true;
         }
+        
+        void set_32_bit_field(const size_t& index, const uint32_t& value)
+        {
+             assert(index < Size && "set 32 bit field called with out of range error");
+             data[index] = value;
+        } 
 
+        uint32_t operator[](const size_t& index) const
+        {
+             assert(index < Size && "gp_std::hash_t::operator[] called with out of range error");
+             return data[index];
+        }
+  
         // Encode hash_t with variadic template parameters
         template <typename... Fields>
         void encode_hash(Fields... fields)
