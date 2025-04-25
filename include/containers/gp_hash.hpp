@@ -69,6 +69,22 @@ namespace gp_std
             data = temp;
         }
 
+        void invalidate()
+        {
+             for(uint32_t& i : data) i = 0xffffffff;
+        }
+
+        bool is_numeric_limit() const
+        {
+            for(const uint32_t& i : data) if(i != 0xffffffff) return false;
+            return true
+        }
+
+        bool is_valid() const
+        {
+            return !is_numeric_limit();
+        }
+
         // Stream output operator (formatted as hex)
         friend std::ostream& operator<<(std::ostream &os, const hash_t<Size> &hash_t)
         {
