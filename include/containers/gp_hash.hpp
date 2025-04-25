@@ -35,6 +35,13 @@ namespace gp_std
         bool operator<=(const hash<Size> &other) const  { return data <= other.data; }
         bool operator>=(const hash<Size> &other) const  { return data >= other.data; }
 
+        operator bool() const 
+        {
+            for(size_t& i : data)
+            { if(i > 0) return false; }
+            return true;
+        }
+
         // Encode hash with variadic template parameters
         template <typename... Fields>
         void encode_hash(Fields... fields)
