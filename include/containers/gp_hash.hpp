@@ -8,7 +8,7 @@
 namespace gp_std
 {
     template <size_t Size>
-    class hash
+    class hash_t
     {
         static_assert(Size >= 32 && Size % 32 == 0, "Size must be a multiple of 32 and above 32 * 2^n {n = {0,1 ... }}");
 
@@ -16,24 +16,24 @@ namespace gp_std
         gp_std::array<uint32_t, Size / 32> data;
 
     public:
-        hash()
+        hash_t()
         {
             data.fill(0);
         }
 
         template <typename... Fields>
-        hash(Fields... fields)
+        hash_t(Fields... fields)
         {
             data.fill(0);
             encode_hash(fields...);
         }
 
-        bool operator==(const hash<Size> &other) const  { return data == other.data; }
-        bool operator!=(const hash<Size> &other) const  { return !(*this == other);  }
-        bool operator<(const hash<Size> &other)  const  { return data < other.data;  }
-        bool operator>(const hash<Size> &other)  const  { return data > other.data;  }
-        bool operator<=(const hash<Size> &other) const  { return data <= other.data; }
-        bool operator>=(const hash<Size> &other) const  { return data >= other.data; }
+        bool operator==(const hash_t<Size> &other) const  { return data == other.data; }
+        bool operator!=(const hash_t<Size> &other) const  { return !(*this == other);  }
+        bool operator<(const hash_t<Size> &other)  const  { return data < other.data;  }
+        bool operator>(const hash_t<Size> &other)  const  { return data > other.data;  }
+        bool operator<=(const hash_t<Size> &other) const  { return data <= other.data; }
+        bool operator>=(const hash_t<Size> &other) const  { return data >= other.data; }
 
         operator bool() const 
         {
@@ -42,7 +42,7 @@ namespace gp_std
             return true;
         }
 
-        // Encode hash with variadic template parameters
+        // Encode hash_t with variadic template parameters
         template <typename... Fields>
         void encode_hash(Fields... fields)
         {
@@ -58,23 +58,23 @@ namespace gp_std
         }
 
         // Stream output operator (formatted as hex)
-        friend std::ostream& operator<<(std::ostream &os, const hash<Size> &hash)
+        friend std::ostream& operator<<(std::ostream &os, const hash_t<Size> &hash_t)
         {
             os << std::hex;
-            for (size_t i = 0; i < hash.data.size(); ++i)
+            for (size_t i = 0; i < hash_t.data.size(); ++i)
             {
                 if (i > 0)
                     os << ":";
-                os << hash.data[i];
+                os << hash_t.data[i];
             }
             os << std::dec;
             return os;
         }
 
         // Stream input operator (reads hex values)
-        friend std::istream &operator>>(std::istream &is, hash<Size> &hash)
+        friend std::istream &operator>>(std::istream &is, hash_t<Size> &hash_t)
         {
-            for (auto &val : hash.data)
+            for (auto &val : hash_t.data)
             {
                 is >> std::hex >> val;
             }
